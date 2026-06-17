@@ -26,7 +26,7 @@ This tool lets you define a campaign in a YAML file and deploy it with one comma
 meta-ads create --config campaign.yaml
 ```
 
-One campaign. One ad set. Multiple ads. All created in seconds.
+One campaign. One ad set. Multiple ads. All created in seconds. You also get account lookup, campaign listings, insights, budget updates, bulk status operations, setup snippets, spend limits, and local audit logs.
 
 ## Install
 
@@ -90,6 +90,8 @@ Create a `.env` file in your project root (or export these in your shell):
 | `META_AD_ACCOUNT_ID` | Yes | Your ad account ID (numbers only, no `act_` prefix) |
 | `META_PAGE_ID` | Yes | Your Facebook Page ID |
 | `META_API_VERSION` | No | API version (default: `v21.0`) |
+| `META_ADS_MAX_DAILY_BUDGET_CENTS` | No | Optional daily budget guardrail |
+| `META_ADS_AUDIT_LOG_PATH` | No | Optional JSONL audit log path |
 
 ### Campaign Config (YAML)
 
@@ -136,6 +138,19 @@ ads:
 
 ## Commands
 
+### `meta-ads setup`
+
+Print local MCP setup snippets for Claude, Cursor, Codex, or ChatGPT.
+
+```bash
+meta-ads setup --client claude
+meta-ads setup --client cursor
+meta-ads setup --client codex
+meta-ads setup --client chatgpt
+```
+
+ChatGPT requires a hosted MCP endpoint. Until that ships, the command prints the local config and notes the hosted requirement.
+
 ### `meta-ads create`
 
 Create a full campaign from your YAML config.
@@ -160,6 +175,81 @@ Check the status of a campaign and all its ads.
 
 ```bash
 meta-ads status 120243616427570285
+```
+
+### `meta-ads account`
+
+Show the configured ad account.
+
+```bash
+meta-ads account
+meta-ads account --json-output
+```
+
+### `meta-ads campaigns`
+
+List recent campaigns.
+
+```bash
+meta-ads campaigns --limit 25
+meta-ads campaigns --json-output
+```
+
+### `meta-ads adsets`
+
+List recent ad sets.
+
+```bash
+meta-ads adsets --limit 25
+```
+
+### `meta-ads ads`
+
+List recent ads.
+
+```bash
+meta-ads ads --limit 25
+```
+
+### `meta-ads insights`
+
+Pull account, campaign, ad set, or ad insights.
+
+```bash
+meta-ads insights --level campaign --date-preset last_7d
+meta-ads insights 120243616427570285 --date-preset last_30d --json-output
+```
+
+### `meta-ads budget <object-id> <daily-budget-cents>`
+
+Update daily budget for a campaign or ad set. This defaults to dry run.
+
+```bash
+meta-ads budget 120243616427570285 3000
+meta-ads budget 120243616427570285 3000 --live
+meta-ads budget 120243616427570285 3000 --live --yes
+```
+
+If `META_ADS_MAX_DAILY_BUDGET_CENTS` is set, updates above that cap are blocked.
+
+### `meta-ads upload-image <image-path>`
+
+Upload an image and return its Meta image hash. This defaults to dry run.
+
+```bash
+meta-ads upload-image ./images/ad.png
+meta-ads upload-image ./images/ad.png --live
+meta-ads upload-image ./images/ad.png --live --yes
+```
+
+### `meta-ads bulk-status <status> <campaign-id...>`
+
+Bulk pause, activate, or delete campaigns. This defaults to dry run.
+
+```bash
+meta-ads bulk-status PAUSED 111 222 333
+meta-ads bulk-status ACTIVE 111 222 333 --live
+meta-ads bulk-status DELETED 111 222 333 --live --yes
 ```
 
 ### `meta-ads pause <campaign-id>`
@@ -193,6 +283,14 @@ Validate your YAML config without making any API calls.
 ```bash
 meta-ads validate --config campaign.yaml
 ```
+
+## Safety controls
+
+- Campaigns are created as `PAUSED` by default.
+- `meta-ads budget`, `meta-ads upload-image`, and `meta-ads bulk-status` default to dry run.
+- Live budget, media upload, and bulk operations require `--live`, with an interactive confirmation unless `--yes` is passed.
+- `META_ADS_MAX_DAILY_BUDGET_CENTS` blocks budget changes above your chosen cap.
+- Mutating commands write JSONL audit events. Default path: `~/.meta-ads-cli/audit.jsonl`.
 
 ## Getting a Meta Access Token
 

@@ -183,6 +183,37 @@ class MetaAdsAPI:
         """Get campaign details."""
         return self._request("GET", campaign_id, params={"fields": fields})
 
+    def get_ad_account(self, fields="id,name,account_status,currency,timezone_name,amount_spent,balance"):
+        """Get configured ad account details."""
+        return self._request("GET", self.act_id, params={"fields": fields})
+
+    def list_campaigns(self, fields="id,name,status,effective_status,objective,created_time,updated_time", limit=25):
+        """List campaigns in the configured ad account."""
+        result = self._request(
+            "GET",
+            f"{self.act_id}/campaigns",
+            params={"fields": fields, "limit": str(limit)},
+        )
+        return result.get("data", [])
+
+    def list_ad_sets(self, fields="id,name,status,effective_status,daily_budget,campaign_id", limit=25):
+        """List ad sets in the configured ad account."""
+        result = self._request(
+            "GET",
+            f"{self.act_id}/adsets",
+            params={"fields": fields, "limit": str(limit)},
+        )
+        return result.get("data", [])
+
+    def list_ads(self, fields="id,name,status,effective_status,adset_id,campaign_id", limit=25):
+        """List ads in the configured ad account."""
+        result = self._request(
+            "GET",
+            f"{self.act_id}/ads",
+            params={"fields": fields, "limit": str(limit)},
+        )
+        return result.get("data", [])
+
     def get_ad_sets(self, campaign_id, fields="name,status,daily_budget"):
         """Get ad sets for a campaign."""
         result = self._request("GET", f"{campaign_id}/adsets", params={"fields": fields})
@@ -196,6 +227,33 @@ class MetaAdsAPI:
     def update_status(self, object_id, status):
         """Update the status of a campaign, ad set, or ad."""
         return self._request("POST", object_id, params={"status": status})
+
+    def get_insights(
+        self,
+        object_id,
+        fields="impressions,clicks,spend,cpc,cpm,ctr,actions",
+        level=None,
+        date_preset="last_7d",
+        limit=25,
+    ):
+        """Get insights for an account, campaign, ad set, or ad."""
+        params = {
+            "fields": fields,
+            "date_preset": date_preset,
+            "limit": str(limit),
+        }
+        if level:
+            params["level"] = level
+        result = self._request("GET", f"{object_id}/insights", params=params)
+        return result.get("data", [])
+
+    def update_daily_budget(self, object_id, daily_budget_cents):
+        """Update daily budget for a campaign or ad set."""
+        return self._request(
+            "POST",
+            object_id,
+            params={"daily_budget": str(daily_budget_cents)},
+        )
 
     def delete_campaign(self, campaign_id):
         """Delete a campaign (sets status to DELETED)."""
