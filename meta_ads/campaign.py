@@ -21,6 +21,7 @@ def create_full_campaign(api, config):
         "creatives": [],
         "ads": [],
     }
+    api.partial_campaign_result = result
 
     # Step 1: Upload images
     click.echo(click.style("\n[1/4] Uploading images", fg="blue", bold=True))
