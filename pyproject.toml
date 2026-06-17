@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "meta-ads-cli"
-version = "0.1.0"
+version = "0.2.0"
 description = "Create and manage Meta (Facebook/Instagram) ad campaigns from your terminal."
 readme = "README.md"
 license = "MIT"
