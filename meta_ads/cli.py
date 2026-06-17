@@ -22,10 +22,19 @@ def audit_log_path():
     return Path.home() / ".meta-ads-cli" / "audit.jsonl"
 
 
+def check_audit_log_writable():
+    path = audit_log_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8"):
+            pass
+    except OSError as exc:
+        raise click.ClickException(f"Audit log is not writable at {path}: {exc}") from exc
+
+
 def write_audit(action, request, result):
     """Write a local audit event without credentials or secrets."""
     path = audit_log_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
     event = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "action": action,
@@ -33,8 +42,18 @@ def write_audit(action, request, result):
         "request": request,
         "result": result,
     }
-    with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(event, sort_keys=True) + "\n")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(event, sort_keys=True) + "\n")
+    except OSError as exc:
+        return f"Audit log write failed at {path}: {exc}"
+    return None
+
+
+def echo_audit_warning(warning):
+    if warning:
+        click.echo(click.style(f"Warning: {warning}", fg="yellow"))
 
 
 def bounded_limit(limit):
@@ -138,13 +157,23 @@ def create(config_path, dry_run, yes):
             click.echo("Aborted.")
             sys.exit(0)
     confirmed = not dry_run
+    if confirmed:
+        check_audit_log_writable()
 
     api = get_api(dry_run=dry_run)
 
     try:
         result = create_full_campaign(api, config)
     except MetaAPIError as e:
-        write_audit(
+        failure = {
+                "success": False,
+                "dry_run": dry_run,
+                "confirmed": confirmed,
+                "partial_result": getattr(api, "partial_campaign_result", {}),
+                "error": str(e),
+                "error_code": e.error_code,
+        }
+        audit_warning = write_audit(
             "create",
             {
                 "config_path": config_path,
@@ -154,20 +183,14 @@ def create(config_path, dry_run, yes):
                 "dry_run": dry_run,
                 "confirmed": confirmed,
             },
-            {
-                "success": False,
-                "dry_run": dry_run,
-                "confirmed": confirmed,
-                "partial_result": getattr(api, "partial_campaign_result", {}),
-                "error": str(e),
-                "error_code": e.error_code,
-            },
+            failure,
         )
+        echo_audit_warning(audit_warning)
         click.echo(click.style(f"\nAPI Error: {e}", fg="red"))
         if e.error_code:
             click.echo(click.style(f"Error code: {e.error_code}", fg="red"))
         sys.exit(1)
-    write_audit(
+    audit_warning = write_audit(
         "create",
         {
             "config_path": config_path,
@@ -179,6 +202,7 @@ def create(config_path, dry_run, yes):
         },
         result,
     )
+    echo_audit_warning(audit_warning)
 
     # Summary
     click.echo(click.style("\n" + "=" * 50, fg="green"))
@@ -313,6 +337,8 @@ def budget(object_id, daily_budget_cents, live, yes):
         if not click.confirm(click.style(f"Set {object_id} to ${dollars:.2f}/day?", fg="yellow")):
             click.echo("Aborted.")
             return
+    if confirmed:
+        check_audit_log_writable()
     api = get_api(dry_run=dry_run)
     try:
         api.update_daily_budget(object_id, daily_budget_cents)
@@ -326,7 +352,7 @@ def budget(object_id, daily_budget_cents, live, yes):
         "dry_run": dry_run,
         "confirmed": confirmed,
     }
-    write_audit(
+    audit_warning = write_audit(
         "budget",
         {
             "object_id": object_id,
@@ -336,6 +362,7 @@ def budget(object_id, daily_budget_cents, live, yes):
         },
         result,
     )
+    echo_audit_warning(audit_warning)
     click.echo(click.style("Budget update accepted.", fg="green"))
     if dry_run:
         click.echo("Dry run only. No live Meta change was made.")
@@ -353,6 +380,8 @@ def upload_image(image_path, live, yes):
         if not click.confirm(click.style(f"Upload {image_path.name} to Meta?", fg="yellow")):
             click.echo("Aborted.")
             return
+    if confirmed:
+        check_audit_log_writable()
     api = get_api(dry_run=dry_run)
     try:
         image_hash = api.upload_image(image_path)
@@ -360,11 +389,12 @@ def upload_image(image_path, live, yes):
         click.echo(click.style(f"API Error: {e}", fg="red"))
         sys.exit(1)
     result = {"success": True, "image_hash": image_hash, "dry_run": dry_run, "confirmed": confirmed}
-    write_audit(
+    audit_warning = write_audit(
         "upload-image",
         {"image_path": str(image_path), "dry_run": dry_run, "confirmed": confirmed},
         result,
     )
+    echo_audit_warning(audit_warning)
     click.echo(click.style(f"Image hash: {image_hash}", fg="green"))
     if dry_run:
         click.echo("Dry run only. No live Meta upload was made.")
@@ -386,6 +416,8 @@ def bulk_status(status, campaign_ids, live, yes):
         if not click.confirm(click.style(f"Set {len(campaign_ids)} campaigns to {status}?", fg="yellow")):
             click.echo("Aborted.")
             return
+    if confirmed:
+        check_audit_log_writable()
     api = get_api(dry_run=dry_run)
     changed = []
     current_campaign_id = None
@@ -395,7 +427,7 @@ def bulk_status(status, campaign_ids, live, yes):
             api.update_status(campaign_id, status)
             changed.append({"campaign_id": campaign_id, "status": status})
     except MetaAPIError as e:
-        write_audit(
+        audit_warning = write_audit(
             "bulk-status",
             {
                 "campaign_ids": list(campaign_ids),
@@ -413,14 +445,16 @@ def bulk_status(status, campaign_ids, live, yes):
                 "error_code": e.error_code,
             },
         )
+        echo_audit_warning(audit_warning)
         click.echo(click.style(f"API Error: {e}", fg="red"))
         sys.exit(1)
     result = {"success": True, "dry_run": dry_run, "confirmed": confirmed, "changed": changed}
-    write_audit(
+    audit_warning = write_audit(
         "bulk-status",
         {"campaign_ids": list(campaign_ids), "status": status, "dry_run": dry_run, "confirmed": confirmed},
         result,
     )
+    echo_audit_warning(audit_warning)
     click.echo(click.style(f"{len(changed)} campaign updates accepted.", fg="green"))
     if dry_run:
         click.echo("Dry run only. No live Meta change was made.")
@@ -475,10 +509,12 @@ def status(campaign_id):
 @click.argument("campaign_id")
 def pause(campaign_id):
     """Pause a campaign."""
+    check_audit_log_writable()
     api = get_api()
     try:
         api.update_status(campaign_id, "PAUSED")
-        write_audit("pause", {"campaign_id": campaign_id}, {"success": True, "campaign_id": campaign_id})
+        audit_warning = write_audit("pause", {"campaign_id": campaign_id}, {"success": True, "campaign_id": campaign_id})
+        echo_audit_warning(audit_warning)
         click.echo(click.style(f"Campaign {campaign_id} paused.", fg="green"))
     except MetaAPIError as e:
         click.echo(click.style(f"API Error: {e}", fg="red"))
@@ -495,15 +531,17 @@ def activate(campaign_id, yes):
             click.echo("Aborted.")
             return
     confirmed = True
+    check_audit_log_writable()
 
     api = get_api()
     try:
         api.update_status(campaign_id, "ACTIVE")
-        write_audit(
+        audit_warning = write_audit(
             "activate",
             {"campaign_id": campaign_id, "confirmed": confirmed},
             {"success": True, "campaign_id": campaign_id, "confirmed": confirmed},
         )
+        echo_audit_warning(audit_warning)
         click.echo(click.style(f"Campaign {campaign_id} activated.", fg="green"))
     except MetaAPIError as e:
         click.echo(click.style(f"API Error: {e}", fg="red"))
@@ -520,15 +558,17 @@ def delete(campaign_id, yes):
             click.echo("Aborted.")
             return
     confirmed = True
+    check_audit_log_writable()
 
     api = get_api()
     try:
         api.delete_campaign(campaign_id)
-        write_audit(
+        audit_warning = write_audit(
             "delete",
             {"campaign_id": campaign_id, "confirmed": confirmed},
             {"success": True, "campaign_id": campaign_id, "confirmed": confirmed},
         )
+        echo_audit_warning(audit_warning)
         click.echo(click.style(f"Campaign {campaign_id} deleted.", fg="green"))
     except MetaAPIError as e:
         click.echo(click.style(f"API Error: {e}", fg="red"))
