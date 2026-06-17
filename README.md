@@ -4,6 +4,18 @@ Create and manage Meta (Facebook/Instagram) ad campaigns from your terminal.
 
 > Built by [Attainment Labs](https://attainmentlabs.com)
 
+## Status in the Meta Ads ecosystem
+
+This is an early independent open source Meta Ads CLI, first published in February 2026 before Meta later introduced its official Ads AI Connectors and Ads CLI.
+
+Use Meta's official connector if you want Meta-hosted OAuth and first-party support. Use this project if you want a lightweight, self-managed, scriptable CLI that you can inspect, fork, and run inside your own workflow.
+
+Related:
+
+- [Meta's official Ads CLI documentation](https://developers.facebook.com/documentation/ads-commerce/ads-ai-connectors/ads-cli/ads-cli-overview)
+- [Attainment's companion MCP server](https://github.com/attainmentlabs/meta-ads-mcp)
+- [Meta Ads Automation Playbook](https://attainmentlabs.com/meta-ads-playbook)
+
 ## Why
 
 Meta Ads Manager is slow. Clicking through 15 screens to launch a campaign is a waste of time when you already know what you want to run.
@@ -238,7 +250,7 @@ Everything is created as `PAUSED` by default so you can review before spending.
 
 ## Want the Full Playbook?
 
-We wrote a free guide covering Meta Ads automation end to end: OAuth setup walkthrough, audience segmentation strategy, budget allocation frameworks, creative testing, scaling rules, and common API errors with fixes.
+We wrote a free guide covering Meta Ads AI automation end to end: when to use CLI, when to use MCP, OAuth setup walkthrough, audience segmentation strategy, budget allocation frameworks, creative testing, scaling rules, and common API errors with fixes.
 
 **[Get the Guide: The Engineer's Playbook for Meta Ads](https://attainmentlabs.com/meta-ads-playbook)**
 
