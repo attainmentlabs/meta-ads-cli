@@ -292,6 +292,29 @@ meta-ads validate --config campaign.yaml
 - `META_ADS_MAX_DAILY_BUDGET_CENTS` blocks budget changes above your chosen cap.
 - Mutating commands write JSONL audit events. Default path: `~/.meta-ads-cli/audit.jsonl`.
 
+## Automation
+
+Built for scripting. Mutating commands take `--yes` to skip the prompt, read commands take `--json-output` for machine-readable output, and every command exits non-zero on failure, so it drops into shell scripts, cron, or CI cleanly.
+
+Create many campaigns from a folder of configs:
+
+```bash
+for cfg in campaigns/*.yaml; do
+  meta-ads create --config "$cfg" --yes
+done
+```
+
+Pipe results into other tools:
+
+```bash
+meta-ads campaigns --json-output | jq '.[] | {id, name, status}'
+meta-ads insights --level campaign --date-preset last_7d --json-output > insights.json
+```
+
+`--date-preset` accepts any Meta preset (`yesterday`, `last_7d`, `last_30d`, and so on).
+
+Guardrails still apply unattended: campaigns create as `PAUSED`, `META_ADS_MAX_DAILY_BUDGET_CENTS` caps budget changes, and every mutating run appends a JSONL audit event.
+
 ## Getting a Meta Access Token
 
 This is the part most people get stuck on. Here is the short version:
